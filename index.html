@@ -3,109 +3,76 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Auto Video Player</title>
+<title>Fast Auto Player</title>
+
+<!-- speed optimization -->
+<link rel="preconnect" href="https://www.youtube.com">
+<link rel="preconnect" href="https://www.youtube-nocookie.com">
+<link rel="preconnect" href="https://geo.dailymotion.com">
 
 <style>
 :root{
   --bg:#0f0f0f;
-  --panel:#181818;
-  --panel2:#202020;
-  --text:#fff;
-  --accent:#ff0033;
   --border:#2a2a2a;
-  --glow:0 0 12px rgba(255,0,51,0.4);
+  --accent:#ff0033;
 }
 
-body{
+/* FULL SCREEN FIX */
+html,body{
   margin:0;
-  font-family:Arial;
+  padding:0;
+  width:100%;
+  height:100%;
   background:var(--bg);
-  color:var(--text);
+  overflow:hidden;
+  font-family:Arial;
 }
 
 .app{
-  max-width:900px;
-  margin:auto;
-  padding:16px;
-}
-
-/* Tabs */
-.tabs{
+  width:100vw;
+  height:100vh;
   display:flex;
-  justify-content:center;
-  gap:10px;
-  margin-bottom:12px;
+  flex-direction:column;
 }
 
-.tab-btn{
-  padding:10px 18px;
-  border-radius:999px;
-  border:1px solid var(--border);
-  background:var(--panel2);
-  color:#fff;
-  cursor:pointer;
-}
-
-.tab-btn.active{
-  background:var(--accent);
-  box-shadow:var(--glow);
-  border-color:var(--accent);
-}
-
-.panel{ display:none; }
-.panel.active{ display:block; }
-
-/* Input */
+/* INPUT */
 .input-row{
   display:flex;
   justify-content:center;
+  padding:10px;
+  gap:10px;
 }
 
 input{
-  width:70%;
+  width:80vw;
   padding:12px;
   border-radius:999px;
   border:1px solid var(--border);
-  background:var(--panel2);
+  background:#202020;
   color:#fff;
   outline:none;
 }
 
 input:focus{
   border-color:var(--accent);
-  box-shadow:var(--glow);
 }
 
-/* =========================
-   🎬 VIDEO PLAYBACK ONLY CHANGED
-   ========================= */
-
+/* VIDEO FULL FIX */
 .video-wrap{
-  margin-top:14px;
-  width:100%;
-  height:calc(100vh - 120px); /* dynamic full screen feel */
-  min-height:320px;
-  border-radius:16px;
-  overflow:hidden;
-  background:#000;
-  border:1px solid var(--border);
+  width:100vw;
+  height:calc(100vh - 60px);
+  background:black;
   position:relative;
+  overflow:hidden;
 }
 
-/* make iframe fully responsive */
-iframe{
+/* iframe FULL STRETCH */
+iframe, #ytPlayer{
+  position:absolute;
+  inset:0;
   width:100%;
   height:100%;
   border:none;
-  position:absolute;
-  top:0;
-  left:0;
-}
-
-/* YouTube player container fix */
-#ytPlayer{
-  width:100%;
-  height:100%;
 }
 </style>
 </head>
@@ -114,117 +81,87 @@ iframe{
 
 <div class="app">
 
-<!-- Tabs -->
-<div class="tabs">
-  <button id="tabDM" class="tab-btn active" onclick="switchTab('dm')">Dailymotion</button>
-  <button id="tabYT" class="tab-btn" onclick="switchTab('yt')">YouTube</button>
+<div class="input-row">
+  <input id="input" placeholder="Paste YouTube or Dailymotion URL (auto play)">
 </div>
 
-<!-- DAILYMOTION -->
-<div id="dmPanel" class="panel active">
-
-  <div class="input-row">
-    <input id="dmInput" placeholder="Paste Dailymotion URL (auto play)">
-  </div>
-
-  <div id="dmError" class="error" style="display:none;color:#ff4d4d;text-align:center;">Invalid Dailymotion URL</div>
-
-  <div id="dmBox" class="video-wrap" style="display:none;">
-    <iframe id="dmFrame"></iframe>
-  </div>
-</div>
-
-<!-- YOUTUBE -->
-<div id="ytPanel" class="panel">
-
-  <div class="input-row">
-    <input id="ytInput" placeholder="Paste YouTube URL (auto play)">
-  </div>
-
-  <div id="ytError" class="error" style="display:none;color:#ff4d4d;text-align:center;">Invalid YouTube URL</div>
-
-  <div id="ytBox" class="video-wrap" style="display:none;">
-    <div id="ytPlayer"></div>
-  </div>
-
+<div id="videoBox" class="video-wrap" style="display:none;">
+  <div id="ytPlayer"></div>
+  <iframe id="dmFrame"></iframe>
 </div>
 
 </div>
 
-<!-- YouTube API -->
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
-let player;
+let ytPlayer;
 
-/* Tabs */
-function switchTab(t){
-  document.getElementById("tabDM").classList.toggle("active",t==="dm");
-  document.getElementById("tabYT").classList.toggle("active",t==="yt");
-
-  document.getElementById("dmPanel").classList.toggle("active",t==="dm");
-  document.getElementById("ytPanel").classList.toggle("active",t==="yt");
-}
-
-/* Dailymotion */
-function parseDM(url){
-  const m = url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
-  return m ? m[1] : null;
-}
-
-function updateDM(){
-  const url = document.getElementById("dmInput").value.trim();
-  const id = parseDM(url);
-
-  if(!id){
-    document.getElementById("dmBox").style.display="none";
-    return;
-  }
-
-  document.getElementById("dmBox").style.display="block";
-
-  document.getElementById("dmFrame").src =
-    "https://geo.dailymotion.com/player.html?video=" + id;
-}
-
-/* YouTube */
+/* FAST DETECT */
 function getYT(url){
   try{
-    const u = new URL(url);
+    const u=new URL(url);
     if(u.searchParams.get("v")) return u.searchParams.get("v");
     if(u.hostname.includes("youtu.be")) return u.pathname.slice(1);
   }catch(e){}
   return null;
 }
 
-function updateYT(){
-  const url = document.getElementById("ytInput").value.trim();
-  const id = getYT(url);
-
-  if(!id){
-    document.getElementById("ytBox").style.display="none";
-    return;
-  }
-
-  document.getElementById("ytBox").style.display="block";
-
-  if(player){
-    player.loadVideoById(id);
-    return;
-  }
-
-  player = new YT.Player('ytPlayer',{
-    videoId:id,
-    playerVars:{rel:0, autoplay:1}
-  });
+function getDM(url){
+  const m=url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
+  return m?m[1]:null;
 }
 
-/* Auto detect */
-document.getElementById("dmInput").addEventListener("input", updateDM);
-document.getElementById("dmInput").addEventListener("paste", ()=>setTimeout(updateDM,0));
+/* MAIN AUTO LOAD (FAST PATH) */
+function loadVideo(){
+  const url=document.getElementById("input").value.trim();
+  const box=document.getElementById("videoBox");
+  const yt=getYT(url);
+  const dm=getDM(url);
 
-document.getElementById("ytInput").addEventListener("input", updateYT);
-document.getElementById("ytInput").addEventListener("paste", ()=>setTimeout(updateYT,0));
+  if(yt){
+    box.style.display="block";
+
+    if(!ytPlayer){
+      ytPlayer=new YT.Player("ytPlayer",{
+        videoId:yt,
+        playerVars:{
+          autoplay:1,
+          mute:1,       // required for instant autoplay
+          rel:0
+        },
+        events:{
+          onReady:(e)=>{
+            e.target.playVideo();
+            // attempt unmute (browser dependent)
+            setTimeout(()=>e.target.unMute(),500);
+          }
+        }
+      });
+    }else{
+      ytPlayer.loadVideoById(yt);
+      ytPlayer.playVideo();
+    }
+
+    document.getElementById("dmFrame").style.display="none";
+  }
+
+  else if(dm){
+    box.style.display="block";
+
+    const frame=document.getElementById("dmFrame");
+    frame.style.display="block";
+    frame.src="https://geo.dailymotion.com/player.html?video="+dm;
+  }
+
+  else{
+    box.style.display="none";
+  }
+}
+
+/* SPEED OPTIMIZED EVENT (NO DELAY) */
+document.getElementById("input").addEventListener("input",loadVideo);
+document.getElementById("input").addEventListener("paste",()=>setTimeout(loadVideo,0));
 
 function onYouTubeIframeAPIReady(){}
 </script>
