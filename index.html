@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DM & YT Bypass Ads</title>
+<title>Auto Video Player</title>
 
 <style>
 :root{
@@ -20,22 +20,13 @@ body{
   margin:0;
   font-family:Arial;
   background:var(--bg);
-  color:#fff;
-  overflow:hidden;
+  color:var(--text);
 }
 
-/* APP (disabled when video active) */
 .app{
   max-width:900px;
   margin:auto;
   padding:16px;
-  transition:0.2s;
-}
-
-/* Disable all UI when video is active */
-.app.locked{
-  pointer-events:none;
-  opacity:0.2;
 }
 
 /* Tabs */
@@ -52,9 +43,24 @@ body{
   border:1px solid var(--border);
   background:var(--panel2);
   color:#fff;
+  cursor:pointer;
 }
 
-/* Inputs */
+.tab-btn.active{
+  background:var(--accent);
+  box-shadow:var(--glow);
+  border-color:var(--accent);
+}
+
+.panel{ display:none; }
+.panel.active{ display:block; }
+
+/* Input */
+.input-row{
+  display:flex;
+  justify-content:center;
+}
+
 input{
   width:70%;
   padding:12px;
@@ -62,110 +68,126 @@ input{
   border:1px solid var(--border);
   background:var(--panel2);
   color:#fff;
+  outline:none;
 }
 
-/* VIDEO FULLSCREEN */
+input:focus{
+  border-color:var(--accent);
+  box-shadow:var(--glow);
+}
+
+/* =========================
+   🎬 VIDEO PLAYBACK ONLY CHANGED
+   ========================= */
+
 .video-wrap{
-  position:fixed;
-  top:0;
-  left:0;
-  width:100vw;
-  height:100vh;
+  margin-top:14px;
+  width:100%;
+  height:calc(100vh - 120px); /* dynamic full screen feel */
+  min-height:320px;
+  border-radius:16px;
+  overflow:hidden;
   background:#000;
-  display:none;
-  z-index:9999;
+  border:1px solid var(--border);
+  position:relative;
 }
 
-/* iframe fills screen */
+/* make iframe fully responsive */
 iframe{
   width:100%;
   height:100%;
   border:none;
-}
-
-/* overlay controls */
-.controls{
   position:absolute;
-  bottom:20px;
-  left:20px;
-  right:20px;
-  display:flex;
-  gap:10px;
-  align-items:center;
-  padding:12px;
-  background:rgba(0,0,0,0.6);
-  border-radius:12px;
-  backdrop-filter:blur(8px);
-  pointer-events:auto;
+  top:0;
+  left:0;
 }
 
-button{
-  padding:8px 12px;
-  border-radius:10px;
-  border:1px solid #333;
-  background:#222;
-  color:#fff;
-  cursor:pointer;
-}
-
-button:hover{
-  background:var(--accent);
-  box-shadow:var(--glow);
-}
-
-.slider{ flex:1; }
-
-.error{
-  text-align:center;
-  color:#ff4d4d;
-  margin-top:8px;
+/* YouTube player container fix */
+#ytPlayer{
+  width:100%;
+  height:100%;
 }
 </style>
 </head>
 
 <body>
 
-<div class="app" id="app">
+<div class="app">
 
-<!-- INPUT UI -->
+<!-- Tabs -->
 <div class="tabs">
-  <button>Auto Player</button>
+  <button id="tabDM" class="tab-btn active" onclick="switchTab('dm')">Dailymotion</button>
+  <button id="tabYT" class="tab-btn" onclick="switchTab('yt')">YouTube</button>
 </div>
 
-<div style="display:flex;justify-content:center;">
-  <input id="urlInput" placeholder="Paste YouTube or Dailymotion URL">
+<!-- DAILYMOTION -->
+<div id="dmPanel" class="panel active">
+
+  <div class="input-row">
+    <input id="dmInput" placeholder="Paste Dailymotion URL (auto play)">
+  </div>
+
+  <div id="dmError" class="error" style="display:none;color:#ff4d4d;text-align:center;">Invalid Dailymotion URL</div>
+
+  <div id="dmBox" class="video-wrap" style="display:none;">
+    <iframe id="dmFrame"></iframe>
+  </div>
 </div>
 
-<div id="error" class="error" style="display:none;">Invalid URL</div>
+<!-- YOUTUBE -->
+<div id="ytPanel" class="panel">
 
-</div>
+  <div class="input-row">
+    <input id="ytInput" placeholder="Paste YouTube URL (auto play)">
+  </div>
 
-<!-- FULLSCREEN VIDEO -->
-<div class="video-wrap" id="videoBox">
+  <div id="ytError" class="error" style="display:none;color:#ff4d4d;text-align:center;">Invalid YouTube URL</div>
 
-  <div id="ytPlayer"></div>
-
-  <!-- Controls -->
-  <div class="controls">
-    <button onclick="togglePlay()">▶ / ⏸</button>
-    <button onclick="toggleMute()">🔇</button>
-    <input class="slider" type="range" min="0" max="100" value="50" oninput="setVolume(this.value)">
-    <button onclick="exitVideo()">❌</button>
+  <div id="ytBox" class="video-wrap" style="display:none;">
+    <div id="ytPlayer"></div>
   </div>
 
 </div>
 
+</div>
+
+<!-- YouTube API -->
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 let player;
 
-/* lock UI */
-function lockUI(state){
-  document.getElementById("app").classList.toggle("locked", state);
+/* Tabs */
+function switchTab(t){
+  document.getElementById("tabDM").classList.toggle("active",t==="dm");
+  document.getElementById("tabYT").classList.toggle("active",t==="yt");
+
+  document.getElementById("dmPanel").classList.toggle("active",t==="dm");
+  document.getElementById("ytPanel").classList.toggle("active",t==="yt");
 }
 
-/* detect YouTube */
+/* Dailymotion */
+function parseDM(url){
+  const m = url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
+  return m ? m[1] : null;
+}
+
+function updateDM(){
+  const url = document.getElementById("dmInput").value.trim();
+  const id = parseDM(url);
+
+  if(!id){
+    document.getElementById("dmBox").style.display="none";
+    return;
+  }
+
+  document.getElementById("dmBox").style.display="block";
+
+  document.getElementById("dmFrame").src =
+    "https://geo.dailymotion.com/player.html?video=" + id;
+}
+
+/* YouTube */
 function getYT(url){
   try{
     const u = new URL(url);
@@ -175,77 +197,36 @@ function getYT(url){
   return null;
 }
 
-/* detect Dailymotion */
-function getDM(url){
-  const m = url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
-  return m ? m[1] : null;
-}
+function updateYT(){
+  const url = document.getElementById("ytInput").value.trim();
+  const id = getYT(url);
 
-/* AUTO LOAD */
-document.getElementById("urlInput").addEventListener("input", function(){
-  const url = this.value.trim();
-
-  const yt = getYT(url);
-  const dm = getDM(url);
-
-  if(yt){
-    openVideo("yt", yt);
-  } else if(dm){
-    openVideo("dm", dm);
-  }
-});
-
-/* OPEN VIDEO */
-function openVideo(type,id){
-  document.getElementById("videoBox").style.display="block";
-  lockUI(true);
-
-  if(type==="yt"){
-    if(player){
-      player.loadVideoById(id);
-      return;
-    }
-
-    player = new YT.Player('ytPlayer',{
-      videoId:id,
-      playerVars:{
-        autoplay:1,
-        rel:0,
-        modestbranding:1
-      }
-    });
+  if(!id){
+    document.getElementById("ytBox").style.display="none";
+    return;
   }
 
-  if(type==="dm"){
-    document.getElementById("ytPlayer").innerHTML =
-      `<iframe src="https://geo.dailymotion.com/player.html?video=${id}" allowfullscreen></iframe>`;
-  }
-}
+  document.getElementById("ytBox").style.display="block";
 
-/* CONTROLS */
-function togglePlay(){
   if(player){
-    const s = player.getPlayerState();
-    s===1 ? player.pauseVideo() : player.playVideo();
+    player.loadVideoById(id);
+    return;
   }
+
+  player = new YT.Player('ytPlayer',{
+    videoId:id,
+    playerVars:{rel:0, autoplay:1}
+  });
 }
 
-function toggleMute(){
-  if(player){
-    player.isMuted() ? player.unMute() : player.mute();
-  }
-}
+/* Auto detect */
+document.getElementById("dmInput").addEventListener("input", updateDM);
+document.getElementById("dmInput").addEventListener("paste", ()=>setTimeout(updateDM,0));
 
-function setVolume(v){
-  if(player) player.setVolume(v);
-}
+document.getElementById("ytInput").addEventListener("input", updateYT);
+document.getElementById("ytInput").addEventListener("paste", ()=>setTimeout(updateYT,0));
 
-/* EXIT FULLSCREEN */
-function exitVideo(){
-  document.getElementById("videoBox").style.display="none";
-  document.getElementById("ytPlayer").innerHTML="";
-  lockUI(false);
-}
+function onYouTubeIframeAPIReady(){}
 </script>
 
 </body>
