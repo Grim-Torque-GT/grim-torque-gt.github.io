@@ -1,249 +1,280 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="referrer" content="strict-origin-when-cross-origin">
-  <title>DM & YT Ad-Free</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-    }
-    .app {
-      width: 100%;
-      min-height: 100vh;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 4px;
-      box-sizing: border-box;
-    }
-    .tabs {
-      display: inline-flex;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-    .tab-btn {
-      border: 1px solid #bbb;
-      background: #f5f5f5;
-      padding: 6px 12px;
-      cursor: pointer;
-    }
-    .tab-btn.active {
-      background: #202020;
-      border-color: #202020;
-      color: #fff;
-    }
-    .panel {
-      display: none;
-      width: 100%;
-    }
-    .panel.active {
-      display: block;
-    }
-    #panelDailymotion > div:first-child,
-    #panelYouTube > div:first-child {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 6px;
-      width: 100%;
-    }
-    .media-container {
-      display: none;
-      width: 100%;
-      height: calc(100vh - 100px);
-      min-height: 280px;
-      margin-top: 8px;
-      position: relative;
-      overflow: hidden;
-      background: #000;
-      border: 1px solid #222;
-      box-sizing: border-box;
-    }
-    .media-frame {
-      border: none;
-      width: 100%;
-      height: 100%;
-      position: absolute;
-      left: 0;
-      top: 0;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DM + YT Advanced Player</title>
+
+<style>
+:root{
+  --bg:#0f0f0f;
+  --panel:#181818;
+  --panel2:#202020;
+  --text:#fff;
+  --accent:#ff0033;
+  --border:#2a2a2a;
+  --glow:0 0 12px rgba(255,0,51,0.4);
+}
+
+body{
+  margin:0;
+  font-family:Arial;
+  background:var(--bg);
+  color:var(--text);
+}
+
+.app{
+  max-width:900px;
+  margin:auto;
+  padding:16px;
+}
+
+/* Tabs */
+.tabs{
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.tab-btn{
+  padding:10px 18px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--panel2);
+  color:#fff;
+  cursor:pointer;
+}
+
+.tab-btn.active{
+  background:var(--accent);
+  box-shadow:var(--glow);
+  border-color:var(--accent);
+}
+
+/* Panels */
+.panel{ display:none; }
+.panel.active{ display:block; }
+
+/* Inputs */
+.input-row{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+}
+
+input{
+  padding:12px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--panel2);
+  color:#fff;
+  width:60%;
+  outline:none;
+}
+
+input:focus{
+  border-color:var(--accent);
+  box-shadow:var(--glow);
+}
+
+button{
+  padding:10px 14px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--panel2);
+  color:#fff;
+  cursor:pointer;
+}
+
+button:hover{
+  background:var(--accent);
+  box-shadow:var(--glow);
+}
+
+/* Video container */
+.video-wrap{
+  position:relative;
+  margin-top:14px;
+  height:65vh;
+  min-height:320px;
+  border-radius:16px;
+  overflow:hidden;
+  background:black;
+  border:1px solid var(--border);
+}
+
+/* iframe */
+iframe{
+  width:100%;
+  height:100%;
+  border:none;
+}
+
+/* YouTube controls overlay */
+.controls{
+  position:absolute;
+  bottom:10px;
+  left:10px;
+  right:10px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px;
+  background:rgba(0,0,0,0.65);
+  border-radius:12px;
+  backdrop-filter:blur(6px);
+}
+
+.slider{
+  flex:1;
+}
+
+/* error */
+.error{
+  text-align:center;
+  color:#ff4d4d;
+  margin-top:8px;
+}
+</style>
 </head>
+
 <body>
-  <div class="app">
-  <div class="tabs">
-    <button id="tabDailymotion" class="tab-btn active" type="button" onclick="switchTab('dailymotion')">Dailymotion</button>
-    <button id="tabYouTube" class="tab-btn" type="button" onclick="switchTab('youtube')">YouTube</button>
+
+<div class="app">
+
+<!-- Tabs -->
+<div class="tabs">
+  <button id="tabDM" class="tab-btn active" onclick="switchTab('dm')">Dailymotion</button>
+  <button id="tabYT" class="tab-btn" onclick="switchTab('yt')">YouTube</button>
+</div>
+
+<!-- DAILYMOTION -->
+<div id="dmPanel" class="panel active">
+
+  <div class="input-row">
+    <input id="dmInput" placeholder="Paste Dailymotion URL">
+    <button onclick="loadDM()">Load</button>
   </div>
 
-  <div id="panelDailymotion" class="panel active">
-    <div>
-      <input id="newVideoUrl" oninput="updateVideo()" size="35" type="url" placeholder="Paste Dailymotion URL">
-      <button type="button" onclick="pasteFromClipboard()">Paste</button>
-    </div>
-    <p id="dmError" style="display:none;color:#c40000;text-align:center;margin:6px 0 0;">Non-Dailymotion URL</p>
+  <div class="error" id="dmError" style="display:none;">Invalid Dailymotion URL</div>
 
-    <div id="videoContainer" class="media-container">
-      <iframe
-        id="videoPlayer"
-        title="Dailymotion Video Player"
-        referrerpolicy="strict-origin-when-cross-origin"
-        allow="autoplay; encrypted-media; picture-in-picture; web-share; fullscreen"
-        allowfullscreen
-        class="media-frame">
-      </iframe>
+  <div class="video-wrap" id="dmBox" style="display:none;">
+    <iframe id="dmFrame"></iframe>
+  </div>
+</div>
+
+<!-- YOUTUBE -->
+<div id="ytPanel" class="panel">
+
+  <div class="input-row">
+    <input id="ytInput" placeholder="Paste YouTube URL">
+    <button onclick="loadYT()">Load</button>
+  </div>
+
+  <div class="error" id="ytError" style="display:none;">Invalid YouTube URL</div>
+
+  <div class="video-wrap" id="ytBox" style="display:none;">
+    <div id="ytPlayer"></div>
+
+    <!-- Overlay Controls -->
+    <div class="controls">
+      <button onclick="togglePlay()">▶ / ⏸</button>
+      <button onclick="toggleMute()">🔇</button>
+      <input class="slider" type="range" min="0" max="100" value="50" oninput="setVolume(this.value)">
+      <button onclick="fullscreen()">⛶</button>
     </div>
   </div>
 
-  <div id="panelYouTube" class="panel">
-    <div>
-      <input id="ytInput" oninput="updateYouTubeVideo()" size="35" type="url" placeholder="Paste YouTube URL">
-      <button type="button" onclick="pasteFromClipboardYouTube()">Paste</button>
-    </div>
-    <p id="ytError" style="display:none;color:#c40000;text-align:center;margin:6px 0 0;">Non-YouTube URL</p>
-    <div id="ytVideoContainer" class="media-container">
-      <iframe
-        id="ytEmbed"
-        title="YouTube Embedded Player"
-        referrerpolicy="strict-origin-when-cross-origin"
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-        allowfullscreen
-        class="media-frame">
-      </iframe>
-    </div>
-  </div>
+</div>
 
-  <script>
-    let currentTab = "dailymotion";
-    function switchTab(tab) {
-      currentTab = tab;
-      const tabDailymotion = document.getElementById("tabDailymotion");
-      const tabYouTube = document.getElementById("tabYouTube");
-      const panelDailymotion = document.getElementById("panelDailymotion");
-      const panelYouTube = document.getElementById("panelYouTube");
+</div>
 
-      tabDailymotion.classList.toggle("active", tab === "dailymotion");
-      tabYouTube.classList.toggle("active", tab === "youtube");
-      panelDailymotion.classList.toggle("active", tab === "dailymotion");
-      panelYouTube.classList.toggle("active", tab === "youtube");
-    }
+<!-- YouTube API -->
+<script src="https://www.youtube.com/iframe_api"></script>
 
-    function updateVideo() {
-      const url = document.getElementById("newVideoUrl").value.trim();
-      const container = document.getElementById("videoContainer");
-      const player = document.getElementById("videoPlayer");
-      const dmError = document.getElementById("dmError");
-      let embedUrl = null;
+<script>
+let player;
 
-      const dmMatch = url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
-      if (dmMatch) {
-        embedUrl = "https://geo.dailymotion.com/player.html?video=" + dmMatch[1];
-      }
+/* Tabs */
+function switchTab(t){
+  document.getElementById("tabDM").classList.toggle("active",t==="dm");
+  document.getElementById("tabYT").classList.toggle("active",t==="yt");
 
-      if (!embedUrl) {
-        container.style.display = "none";
-        player.src = "";
-        dmError.style.display = url ? "block" : "none";
-        return;
-      }
+  document.getElementById("dmPanel").classList.toggle("active",t==="dm");
+  document.getElementById("ytPanel").classList.toggle("active",t==="yt");
+}
 
-      player.src = embedUrl;
-      container.style.display = "block";
-      dmError.style.display = "none";
-    }
+/* Dailymotion */
+function loadDM(){
+  const url = document.getElementById("dmInput").value.trim();
+  const match = url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
 
-    function extractYouTubeId(raw) {
-      try {
-        const val = (raw || "").trim();
-        if (!val) return null;
-        if (/^[a-zA-Z0-9_-]{11}$/.test(val)) return val;
+  if(!match){
+    document.getElementById("dmError").style.display="block";
+    document.getElementById("dmBox").style.display="none";
+    return;
+  }
 
-        const url = new URL(val);
-        const host = url.hostname.replace(/^www\./, "").toLowerCase();
+  document.getElementById("dmError").style.display="none";
+  document.getElementById("dmBox").style.display="block";
+  document.getElementById("dmFrame").src =
+    "https://geo.dailymotion.com/player.html?video=" + match[1];
+}
 
-        if (host === "youtu.be") {
-          const id = url.pathname.split("/").filter(Boolean)[0];
-          return id || null;
-        }
+/* YouTube ID */
+function getYT(url){
+  try{
+    const u = new URL(url);
+    if(u.searchParams.get("v")) return u.searchParams.get("v");
+    if(u.hostname.includes("youtu.be")) return u.pathname.slice(1);
+  }catch(e){}
+  return null;
+}
 
-        if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
-          if (url.pathname === "/watch") return url.searchParams.get("v");
-          const parts = url.pathname.split("/").filter(Boolean);
-          const shortsIndex = parts.indexOf("shorts");
-          if (shortsIndex !== -1 && parts[shortsIndex + 1]) return parts[shortsIndex + 1];
-          const embedIndex = parts.indexOf("embed");
-          if (embedIndex !== -1 && parts[embedIndex + 1]) return parts[embedIndex + 1];
-        }
-      } catch (_) {}
-      return null;
-    }
+/* YouTube load */
+function loadYT(){
+  const id = getYT(document.getElementById("ytInput").value);
+  if(!id){
+    document.getElementById("ytError").style.display="block";
+    return;
+  }
 
-    function updateYouTubeVideo(forceAutoplay) {
-      const ytInput = document.getElementById("ytInput").value.trim();
-      const ytId = extractYouTubeId(ytInput);
-      const container = document.getElementById("ytVideoContainer");
-      const embed = document.getElementById("ytEmbed");
-      const ytError = document.getElementById("ytError");
-      const isWebContext = window.location.protocol === "http:" || window.location.protocol === "https:";
+  document.getElementById("ytError").style.display="none";
+  document.getElementById("ytBox").style.display="block";
 
-      if (ytId) {
-        const ytBase = isWebContext ? "https://www.youtube.com/embed/" : "https://www.youtube-nocookie.com/embed/";
-        const embedUrl = new URL(ytBase + encodeURIComponent(ytId));
-        embedUrl.searchParams.set("autoplay", forceAutoplay ? "1" : "0");
-        embedUrl.searchParams.set("playsinline", "1");
-        embedUrl.searchParams.set("rel", "0");
-        if (isWebContext) {
-          embedUrl.searchParams.set("origin", window.location.origin);
-          embedUrl.searchParams.set("widget_referrer", window.location.href);
-        }
-        embed.src = embedUrl.toString();
-        container.style.display = "block";
-        ytError.style.display = "none";
-        return;
-      }
+  if(player){
+    player.loadVideoById(id);
+    return;
+  }
 
-      embed.src = "";
-      container.style.display = "none";
-      ytError.style.display = ytInput ? "block" : "none";
-    }
+  player = new YT.Player('ytPlayer',{
+    videoId:id,
+    playerVars:{rel:0, modestbranding:1}
+  });
+}
 
-    function autoEmbedYouTube(forceAutoplay) {
-      updateYouTubeVideo(!!forceAutoplay);
-    }
+/* Controls */
+function togglePlay(){
+  const state = player.getPlayerState();
+  state===1 ? player.pauseVideo() : player.playVideo();
+}
 
-    async function pasteFromClipboard() {
-      try {
-        const text = await navigator.clipboard.readText();
-        document.getElementById("newVideoUrl").value = text;
-        updateVideo();
-      } catch (error) {
-        alert("Clipboard access failed: " + error);
-      }
-    }
+function toggleMute(){
+  player.isMuted() ? player.unMute() : player.mute();
+}
 
-    async function pasteFromClipboardYouTube() {
-      try {
-        const text = await navigator.clipboard.readText();
-        document.getElementById("ytInput").value = text;
-        updateYouTubeVideo(true);
-      } catch (error) {
-        alert("Clipboard access failed: " + error);
-      }
-    }
+function setVolume(v){
+  player.setVolume(v);
+}
 
-    document.getElementById("ytInput").addEventListener("input", function () {
-      autoEmbedYouTube(false);
-    });
-    document.getElementById("ytInput").addEventListener("paste", function () {
-      setTimeout(function () {
-        autoEmbedYouTube(true);
-      }, 0);
-    });
-  </script>
-  </div>
+function fullscreen(){
+  document.getElementById("ytBox").requestFullscreen();
+}
+
+/* API ready */
+function onYouTubeIframeAPIReady(){}
+</script>
+
 </body>
 </html>
