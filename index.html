@@ -37,7 +37,6 @@ input{
   outline:none;
 }
 
-/* IMPORTANT: stable layout (NOT aggressive absolute until ready) */
 .video{
   width:100vw;
   height:calc(100vh - 60px);
@@ -45,17 +44,33 @@ input{
   background:#000;
 }
 
-/* SAFE CONTAINER (fixes Dailymotion blank screen) */
+/* players */
 #ytPlayer,#dmPlayer{
   width:100%;
   height:100%;
   position:absolute;
   inset:0;
+  display:none;
 }
 
-/* ensure hidden state doesn't collapse layout */
 .hidden{
   display:none;
+}
+
+#logoOverlay{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+}
+
+#logoOverlay img{
+  width:min(45vw,520px);
+  max-width:80%;
+  height:auto;
+  object-fit:contain;
 }
 </style>
 </head>
@@ -70,23 +85,27 @@ input{
 
 <div class="video">
   <div id="ytPlayer"></div>
-  <div id="dmPlayer"></div>
+
+  <!-- ONLY DAILYMOTION (OLD STABLE METHOD) -->
+  <iframe
+    id="dmPlayer"
+    title="Dailymotion Player"
+    allow="autoplay; fullscreen; picture-in-picture"
+    allowfullscreen>
+  </iframe>
+  <div id="logoOverlay">
+    <img src="bypass-ads.png" alt="Bypass Ads Logo">
+  </div>
 </div>
 
 </div>
 
-<!-- YouTube API -->
 <script src="https://www.youtube.com/iframe_api"></script>
-
-<!-- Dailymotion API -->
-<script src="https://api.dmcdn.net/all.js"></script>
 
 <script>
 
 let ytPlayer = null;
-let dmPlayer = null;
 let ytReady = false;
-let dmReady = false;
 
 /* ---------------- URL PARSERS ---------------- */
 function getYT(url){
@@ -99,100 +118,101 @@ function getYT(url){
 }
 
 function getDM(url){
-  const m=url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
-  return m?m[1]:null;
+  try{
+    const u = new URL(url);
+
+    if(u.hostname.includes("dai.ly")){
+      return u.pathname.replace("/","").split("_")[0] || null;
+    }
+
+    if(u.hostname.includes("dailymotion.com")){
+      const m = u.pathname.match(/video\/([a-zA-Z0-9]+)/);
+      if(m) return m[1];
+
+      const q = u.searchParams.get("video");
+      if(q) return q.split("_")[0];
+    }
+
+  }catch(e){}
+  return null;
 }
 
-/* ---------------- INPUT (DEBOUNCED FOR SPEED) ---------------- */
-let timer=null;
+/* ---------------- DAILYMOTION (RESTORED OLD STYLE) ---------------- */
+function playDailymotion(dmId){
 
-document.getElementById("url").addEventListener("input",()=>{
-  clearTimeout(timer);
-  timer=setTimeout(loadVideo,200);
-});
+  const iframe = document.getElementById("dmPlayer");
 
-document.getElementById("url").addEventListener("paste",()=>{
-  setTimeout(loadVideo,0);
-});
+  /* hide youtube */
+  document.getElementById("ytPlayer").style.display = "none";
+  document.getElementById("logoOverlay").style.display = "none";
+
+  /* show dm iframe */
+  iframe.style.display = "block";
+
+  /* OLD STABLE PLAYER */
+  iframe.src =
+    "https://geo.dailymotion.com/player.html?video=" +
+    dmId +
+    "&autoplay=1&mute=1&queue-enable=false";
+}
+
+/* ---------------- YOUTUBE ---------------- */
+function loadYouTube(id){
+
+  document.getElementById("dmPlayer").style.display = "none";
+  document.getElementById("ytPlayer").style.display = "block";
+  document.getElementById("logoOverlay").style.display = "none";
+
+  if(!ytPlayer){
+    ytPlayer = new YT.Player("ytPlayer",{
+      videoId:id,
+      playerVars:{
+        autoplay:1,
+        mute:1,
+        rel:0
+      }
+    });
+  }else{
+    ytPlayer.loadVideoById(id);
+  }
+}
 
 /* ---------------- MAIN ---------------- */
 function loadVideo(){
 
-  const url=document.getElementById("url").value.trim();
+  const url = document.getElementById("url").value.trim();
 
-  const yt=getYT(url);
-  const dm=getDM(url);
+  const yt = getYT(url);
+  const dm = getDM(url);
 
-  /* ================= YOUTUBE (FAST SWITCH) ================= */
   if(yt && ytReady){
-
-    document.getElementById("dmPlayer").style.display="none";
-    document.getElementById("ytPlayer").style.display="block";
-
-    if(!ytPlayer){
-
-      ytPlayer = new YT.Player("ytPlayer",{
-        videoId:yt,
-        playerVars:{
-          autoplay:1,
-          mute:1,
-          rel:0
-        },
-        events:{
-          onReady:(e)=>{
-            e.target.playVideo();
-          }
-        }
-      });
-
-    }else{
-      ytPlayer.cueVideoById(yt);   // ⚡ fastest + no reload lag
-      ytPlayer.playVideo();
-    }
+    loadYouTube(yt);
   }
-
-  /* ================= DAILYMOTION (FIXED STABLE INIT) ================= */
-  else if(dm && dmReady){
-
-    document.getElementById("ytPlayer").style.display="none";
-    document.getElementById("dmPlayer").style.display="block";
-
-    // ⚠️ CRITICAL: wait layout paint before init
-    requestAnimationFrame(()=>{
-
-      if(!dmPlayer){
-
-        dmPlayer = DM.player("dmPlayer",{
-          video:dm,
-          width:"100%",
-          height:"100%",
-          params:{
-            autoplay:true
-          }
-        });
-
-        dmPlayer.addEventListener("apiready",()=>{
-          dmPlayer.play();
-        });
-
-      }else{
-        dmPlayer.load(dm);
-        dmPlayer.play();
-      }
-
-    });
+  else if(dm){
+    playDailymotion(dm);
+  }else{
+    document.getElementById("ytPlayer").style.display = "none";
+    document.getElementById("dmPlayer").style.display = "none";
+    document.getElementById("logoOverlay").style.display = "flex";
   }
 }
 
-/* ---------------- YOUTUBE READY ---------------- */
+/* ---------------- INPUT ---------------- */
+let timer;
+
+document.getElementById("url").addEventListener("input",()=>{
+  clearTimeout(timer);
+  timer = setTimeout(loadVideo, 200);
+});
+
+document.getElementById("url").addEventListener("paste",()=>{
+  setTimeout(loadVideo, 0);
+});
+
+/* ---------------- YT READY ---------------- */
 function onYouTubeIframeAPIReady(){
   ytReady = true;
 }
-
-/* ---------------- DAILYMOTION READY ---------------- */
-window.dmAsyncInit = function(){
-  dmReady = true;
-};
 
 </script>
 
