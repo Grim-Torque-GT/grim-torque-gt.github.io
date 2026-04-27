@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bypass Ads</title>
+<title>Pro Stable Video Fix</title>
 
 <style>
 html,body{
@@ -47,7 +47,6 @@ input{
   inset:0;
   width:100%;
   height:100%;
-  border:none;
 }
 </style>
 </head>
@@ -77,10 +76,10 @@ input{
 
 let ytPlayer = null;
 let dmPlayer = null;
+let ytReady = false;
+let dmReady = false;
 
-let ytBusy = false;
-
-/* ---------- FAST ID ---------- */
+/* ================= ID PARSER ================= */
 function getYT(url){
   try{
     const u=new URL(url);
@@ -95,66 +94,73 @@ function getDM(url){
   return m?m[1]:null;
 }
 
-/* ---------- INPUT ---------- */
+/* ================= INPUT (DEBOUNCED) ================= */
+let lock=false;
+
 document.getElementById("url").addEventListener("input",()=>{
-  setTimeout(loadVideo,150);
+  if(lock) return;
+  lock=true;
+  setTimeout(()=>{
+    loadVideo();
+    lock=false;
+  },200);
 });
 
 document.getElementById("url").addEventListener("paste",()=>{
   setTimeout(loadVideo,0);
 });
 
-/* ---------- MAIN ---------- */
+/* ================= MAIN ================= */
 function loadVideo(){
-
-  if(ytBusy) return; // 🚀 prevent lag spam lock
-  ytBusy = true;
-  setTimeout(()=>ytBusy=false,200);
 
   const url=document.getElementById("url").value.trim();
 
   const yt=getYT(url);
   const dm=getDM(url);
 
-  /* ================= YOUTUBE FIX ================= */
+  /* ================= YOUTUBE (FAST SWITCH) ================= */
   if(yt){
 
     document.getElementById("dmPlayer").style.display="none";
     document.getElementById("ytPlayer").style.display="block";
 
-    if(!ytPlayer){
-      ytPlayer = new YT.Player("ytPlayer",{
-        videoId:yt,
-        playerVars:{
-          autoplay:1,
-          mute:1,
-          rel:0
-        },
-        events:{
-          onReady:(e)=>{
-            e.target.playVideo();
+    if(ytReady){
+
+      if(!ytPlayer){
+        ytPlayer = new YT.Player("ytPlayer",{
+          videoId:yt,
+          playerVars:{
+            autoplay:1,
+            mute:1,
+            rel:0
+          },
+          events:{
+            onReady:(e)=>{
+              e.target.playVideo();
+            }
           }
-        }
-      });
-    }else{
-      ytPlayer.loadVideoById(yt);
-      ytPlayer.playVideo();
+        });
+      }else{
+        ytPlayer.loadVideoById(yt);
+        ytPlayer.playVideo();
+      }
     }
   }
 
-  /* ================= DAILYMOTION FIX ================= */
+  /* ================= DAILYMOTION (FIXED PROPER INIT) ================= */
   else if(dm){
 
     document.getElementById("ytPlayer").style.display="none";
     document.getElementById("dmPlayer").style.display="block";
 
-    // wait API ready safely
-    if(window.DM && DM.apiReady){
+    if(dmReady){
 
       if(!dmPlayer){
         dmPlayer = DM.player("dmPlayer",{
           video:dm,
-          params:{ autoplay:true }
+          params:{
+            autoplay:true
+          }
         });
 
         dmPlayer.addEventListener("apiready",()=>{
@@ -166,21 +172,19 @@ function loadVideo(){
         dmPlayer.play();
       }
 
-    } else {
-      // retry until API ready
-      setTimeout(loadVideo,200);
     }
   }
 }
 
-/* YouTube API hook */
-function onYouTubeIframeAPIReady(){}
-
-/* Dailymotion API ready flag */
-window.dmReady = false;
-if(window.DM){
-  DM.apiReady = true;
+/* ================= YOUTUBE READY ================= */
+function onYouTubeIframeAPIReady(){
+  ytReady = true;
 }
+
+/* ================= DAILYMOTION READY (CRITICAL FIX) ================= */
+window.dmAsyncInit = function(){
+  dmReady = true;
+};
 
 </script>
 
