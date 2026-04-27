@@ -7,115 +7,165 @@
 
 <style>
 :root{
-  --bg:#000;
+  --bg:#0f0f0f;
+  --panel:#181818;
+  --panel2:#202020;
+  --text:#fff;
   --accent:#ff0033;
-  --border:#222;
+  --border:#2a2a2a;
+  --glow:0 0 12px rgba(255,0,51,0.4);
 }
 
-html, body{
+body{
   margin:0;
-  padding:0;
-  width:100%;
-  height:100%;
-  background:var(--bg);
-  overflow:hidden;
   font-family:Arial;
+  background:var(--bg);
+  color:#fff;
+  overflow:hidden;
 }
 
-/* App wrapper */
+/* APP (disabled when video active) */
 .app{
-  position:fixed;
-  inset:0;
-  display:flex;
-  flex-direction:column;
+  max-width:900px;
+  margin:auto;
+  padding:16px;
+  transition:0.2s;
 }
 
-/* Top bar */
-.topbar{
-  position:absolute;
-  top:0;
-  left:0;
-  right:0;
-  z-index:10;
+/* Disable all UI when video is active */
+.app.locked{
+  pointer-events:none;
+  opacity:0.2;
+}
+
+/* Tabs */
+.tabs{
   display:flex;
   justify-content:center;
-  padding:10px;
-  background:rgba(0,0,0,0.4);
-  backdrop-filter:blur(6px);
+  gap:10px;
+  margin-bottom:12px;
 }
 
-input{
-  width:70%;
-  max-width:700px;
-  padding:12px 14px;
+.tab-btn{
+  padding:10px 18px;
   border-radius:999px;
   border:1px solid var(--border);
-  background:#111;
+  background:var(--panel2);
   color:#fff;
-  outline:none;
 }
 
-input:focus{
-  border-color:var(--accent);
-  box-shadow:0 0 12px rgba(255,0,51,0.4);
+/* Inputs */
+input{
+  width:70%;
+  padding:12px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background:var(--panel2);
+  color:#fff;
 }
 
-/* FULL SCREEN VIDEO */
+/* VIDEO FULLSCREEN */
 .video-wrap{
-  position:absolute;
-  inset:0;
+  position:fixed;
+  top:0;
+  left:0;
   width:100vw;
   height:100vh;
   background:#000;
+  display:none;
+  z-index:9999;
 }
 
-.video-wrap iframe{
-  position:absolute;
-  inset:0;
+/* iframe fills screen */
+iframe{
   width:100%;
   height:100%;
   border:none;
 }
 
-/* error */
-.error{
+/* overlay controls */
+.controls{
   position:absolute;
-  top:60px;
-  width:100%;
+  bottom:20px;
+  left:20px;
+  right:20px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  padding:12px;
+  background:rgba(0,0,0,0.6);
+  border-radius:12px;
+  backdrop-filter:blur(8px);
+  pointer-events:auto;
+}
+
+button{
+  padding:8px 12px;
+  border-radius:10px;
+  border:1px solid #333;
+  background:#222;
+  color:#fff;
+  cursor:pointer;
+}
+
+button:hover{
+  background:var(--accent);
+  box-shadow:var(--glow);
+}
+
+.slider{ flex:1; }
+
+.error{
   text-align:center;
   color:#ff4d4d;
-  font-size:14px;
-  z-index:11;
+  margin-top:8px;
 }
 </style>
 </head>
 
 <body>
 
-<div class="app">
+<div class="app" id="app">
 
-  <!-- Input -->
-  <div class="topbar">
-    <input id="urlInput" placeholder="Paste YouTube or Dailymotion URL (auto play)">
-  </div>
+<!-- INPUT UI -->
+<div class="tabs">
+  <button>Auto Player</button>
+</div>
 
-  <div id="error" class="error" style="display:none;"></div>
+<div style="display:flex;justify-content:center;">
+  <input id="urlInput" placeholder="Paste YouTube or Dailymotion URL">
+</div>
 
-  <!-- Video -->
-  <div class="video-wrap" id="videoBox" style="display:none;">
-    <iframe id="frame"></iframe>
-    <div id="ytPlayer"></div>
+<div id="error" class="error" style="display:none;">Invalid URL</div>
+
+</div>
+
+<!-- FULLSCREEN VIDEO -->
+<div class="video-wrap" id="videoBox">
+
+  <div id="ytPlayer"></div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button onclick="togglePlay()">▶ / ⏸</button>
+    <button onclick="toggleMute()">🔇</button>
+    <input class="slider" type="range" min="0" max="100" value="50" oninput="setVolume(this.value)">
+    <button onclick="exitVideo()">❌</button>
   </div>
 
 </div>
 
-<!-- YouTube API -->
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 let player;
 
-/* Detect tab */
+/* lock UI */
+function lockUI(state){
+  document.getElementById("app").classList.toggle("locked", state);
+}
+
+/* detect YouTube */
 function getYT(url){
   try{
     const u = new URL(url);
@@ -125,64 +175,77 @@ function getYT(url){
   return null;
 }
 
+/* detect Dailymotion */
 function getDM(url){
   const m = url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
   return m ? m[1] : null;
 }
 
-/* MAIN AUTO DETECT */
-function loadVideo(){
-  const url = document.getElementById("urlInput").value.trim();
-  const error = document.getElementById("error");
+/* AUTO LOAD */
+document.getElementById("urlInput").addEventListener("input", function(){
+  const url = this.value.trim();
 
   const yt = getYT(url);
   const dm = getDM(url);
 
-  document.getElementById("videoBox").style.display="block";
-
-  /* YOUTUBE */
   if(yt){
-    error.style.display="none";
+    openVideo("yt", yt);
+  } else if(dm){
+    openVideo("dm", dm);
+  }
+});
 
+/* OPEN VIDEO */
+function openVideo(type,id){
+  document.getElementById("videoBox").style.display="block";
+  lockUI(true);
+
+  if(type==="yt"){
     if(player){
-      player.loadVideoById(yt);
+      player.loadVideoById(id);
       return;
     }
 
-    player = new YT.Player('frame',{
-      videoId:yt,
+    player = new YT.Player('ytPlayer',{
+      videoId:id,
       playerVars:{
         autoplay:1,
         rel:0,
         modestbranding:1
       }
     });
-
-    return;
   }
 
-  /* DAILYMOTION */
-  if(dm){
-    error.style.display="none";
-
-    document.getElementById("frame").src =
-      "https://geo.dailymotion.com/player.html?video=" + dm;
-
-    return;
+  if(type==="dm"){
+    document.getElementById("ytPlayer").innerHTML =
+      `<iframe src="https://geo.dailymotion.com/player.html?video=${id}" allowfullscreen></iframe>`;
   }
-
-  /* INVALID */
-  document.getElementById("videoBox").style.display="none";
-  error.innerText="Invalid URL";
-  error.style.display="block";
 }
 
-/* AUTO DETECT ON TYPE + PASTE */
-document.getElementById("urlInput").addEventListener("input", loadVideo);
-document.getElementById("urlInput").addEventListener("paste", ()=>setTimeout(loadVideo,0));
+/* CONTROLS */
+function togglePlay(){
+  if(player){
+    const s = player.getPlayerState();
+    s===1 ? player.pauseVideo() : player.playVideo();
+  }
+}
 
-/* YouTube API */
-function onYouTubeIframeAPIReady(){}
+function toggleMute(){
+  if(player){
+    player.isMuted() ? player.unMute() : player.mute();
+  }
+}
+
+function setVolume(v){
+  if(player) player.setVolume(v);
+}
+
+/* EXIT FULLSCREEN */
+function exitVideo(){
+  document.getElementById("videoBox").style.display="none";
+  document.getElementById("ytPlayer").innerHTML="";
+  lockUI(false);
+}
 </script>
 
 </body>
