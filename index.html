@@ -3,13 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fast Dual Player Fix</title>
+<title>Stable Fast Player</title>
 
 <style>
 html,body{
   margin:0;
   height:100%;
-  width:100%;
   background:#000;
   font-family:Arial;
   overflow:hidden;
@@ -37,15 +36,13 @@ input{
   color:#fff;
 }
 
-/* FULL SCREEN VIDEO */
 .video{
   width:100vw;
   height:calc(100vh - 60px);
   position:relative;
 }
 
-/* both players full */
-iframe, #ytPlayer, #dmPlayer{
+#ytPlayer,#dmPlayer{
   position:absolute;
   inset:0;
   width:100%;
@@ -70,10 +67,10 @@ iframe, #ytPlayer, #dmPlayer{
 
 </div>
 
-<!-- YouTube API -->
+<!-- YouTube -->
 <script src="https://www.youtube.com/iframe_api"></script>
 
-<!-- Dailymotion API -->
+<!-- Dailymotion -->
 <script src="https://api.dmcdn.net/all.js"></script>
 
 <script>
@@ -81,7 +78,9 @@ iframe, #ytPlayer, #dmPlayer{
 let ytPlayer = null;
 let dmPlayer = null;
 
-/* FAST ID DETECT */
+let ytTimer = null;   // debounce fix
+
+/* ---------- FAST ID ---------- */
 function getYT(url){
   try{
     const u=new URL(url);
@@ -96,14 +95,27 @@ function getDM(url){
   return m?m[1]:null;
 }
 
-/* MAIN FAST SWITCH */
-function load(){
+/* ---------- MAIN INPUT (DEBOUNCED) ---------- */
+function handleInput(){
+  clearTimeout(ytTimer);
+
+  ytTimer = setTimeout(()=>{
+    loadVideo();
+  },250); // ⚡ prevents lag
+}
+
+document.getElementById("url").addEventListener("input", handleInput);
+document.getElementById("url").addEventListener("paste", ()=>setTimeout(handleInput,0));
+
+/* ---------- LOAD ---------- */
+function loadVideo(){
+
   const url=document.getElementById("url").value.trim();
 
   const yt=getYT(url);
   const dm=getDM(url);
 
-  /* ---------------- YOUTUBE FAST ---------------- */
+  /* ================= YOUTUBE (FAST + STABLE) ================= */
   if(yt){
 
     document.getElementById("dmPlayer").style.display="none";
@@ -124,18 +136,19 @@ function load(){
         }
       });
     }else{
-      ytPlayer.cueVideoById(yt);   // ⚡ faster than loadVideoById
+      ytPlayer.loadVideoById(yt); // ⚡ stable reload
       ytPlayer.playVideo();
     }
   }
 
-  /* ---------------- DAILYMOTION FIXED API ---------------- */
+  /* ================= DAILYMOTION (FIXED + VOLUME WORKS) ================= */
   else if(dm){
 
     document.getElementById("ytPlayer").style.display="none";
     document.getElementById("dmPlayer").style.display="block";
 
     if(!dmPlayer){
+
       dmPlayer = DM.player("dmPlayer",{
         video:dm,
         params:{
@@ -152,13 +165,9 @@ function load(){
       dmPlayer.play();
     }
   }
-
 }
 
-/* AUTO RUN (NO BUTTONS, INSTANT) */
-document.getElementById("url").addEventListener("input", load);
-document.getElementById("url").addEventListener("paste",()=>setTimeout(load,0));
-
+/* YouTube API hook */
 function onYouTubeIframeAPIReady(){}
 
 </script>
