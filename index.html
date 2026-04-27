@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Dailymotion Ad-Free Embed Helper</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+    .app {
+      width: 100%;
+      min-height: 100vh;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4px;
+      box-sizing: border-box;
+    }
+    .tabs {
+      display: inline-flex;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .tab-btn {
+      border: 1px solid #bbb;
+      background: #f5f5f5;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #202020;
+      border-color: #202020;
+      color: #fff;
+    }
+    .panel {
+      display: none;
+      width: 100%;
+    }
+    .panel.active {
+      display: block;
+    }
+    #panelDailymotion > div:first-child,
+    #panelYouTube > div:first-child {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+    }
+    .media-container {
+      display: none;
+      width: 100%;
+      height: calc(100vh - 100px);
+      min-height: 280px;
+      margin-top: 8px;
+      position: relative;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid #222;
+      box-sizing: border-box;
+    }
+    .media-frame {
+      border: none;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+  <div class="tabs">
+    <button id="tabDailymotion" class="tab-btn active" type="button" onclick="switchTab('dailymotion')">Dailymotion</button>
+    <button id="tabYouTube" class="tab-btn" type="button" onclick="switchTab('youtube')">YouTube</button>
+  </div>
+
+  <div id="panelDailymotion" class="panel active">
+    <div>
+      <input id="newVideoUrl" oninput="updateVideo()" size="35" type="url" placeholder="Paste Dailymotion URL">
+      <button type="button" onclick="pasteFromClipboard()">Paste</button>
+    </div>
+    <p id="dmError" style="display:none;color:#c40000;text-align:center;margin:6px 0 0;">Non-Dailymotion URL</p>
+
+    <div id="videoContainer" class="media-container">
+      <iframe
+        id="videoPlayer"
+        title="Dailymotion Video Player"
+        referrerpolicy="strict-origin-when-cross-origin"
+        allow="autoplay; encrypted-media; picture-in-picture; web-share; fullscreen"
+        allowfullscreen
+        class="media-frame">
+      </iframe>
+    </div>
+  </div>
+
+  <div id="panelYouTube" class="panel">
+    <div>
+      <input id="ytInput" oninput="updateYouTubeVideo()" size="35" type="url" placeholder="Paste YouTube URL">
+      <button type="button" onclick="pasteFromClipboardYouTube()">Paste</button>
+    </div>
+    <p id="ytError" style="display:none;color:#c40000;text-align:center;margin:6px 0 0;">Non-YouTube URL</p>
+    <div id="ytVideoContainer" class="media-container">
+      <iframe
+        id="ytEmbed"
+        title="YouTube Embedded Player"
+        referrerpolicy="strict-origin-when-cross-origin"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        allowfullscreen
+        class="media-frame">
+      </iframe>
+    </div>
+  </div>
+
+  <script>
+    let currentTab = "dailymotion";
+    function switchTab(tab) {
+      currentTab = tab;
+      const tabDailymotion = document.getElementById("tabDailymotion");
+      const tabYouTube = document.getElementById("tabYouTube");
+      const panelDailymotion = document.getElementById("panelDailymotion");
+      const panelYouTube = document.getElementById("panelYouTube");
+
+      tabDailymotion.classList.toggle("active", tab === "dailymotion");
+      tabYouTube.classList.toggle("active", tab === "youtube");
+      panelDailymotion.classList.toggle("active", tab === "dailymotion");
+      panelYouTube.classList.toggle("active", tab === "youtube");
+    }
+
+    function updateVideo() {
+      const url = document.getElementById("newVideoUrl").value.trim();
+      const container = document.getElementById("videoContainer");
+      const player = document.getElementById("videoPlayer");
+      const dmError = document.getElementById("dmError");
+      let embedUrl = null;
+
+      const dmMatch = url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
+      if (dmMatch) {
+        embedUrl = "https://geo.dailymotion.com/player.html?video=" + dmMatch[1];
+      }
+
+      if (!embedUrl) {
+        container.style.display = "none";
+        player.src = "";
+        dmError.style.display = url ? "block" : "none";
+        return;
+      }
+
+      player.src = embedUrl;
+      container.style.display = "block";
+      dmError.style.display = "none";
+    }
+
+    function extractYouTubeId(raw) {
+      try {
+        const val = (raw || "").trim();
+        if (!val) return null;
+        if (/^[a-zA-Z0-9_-]{11}$/.test(val)) return val;
+
+        const url = new URL(val);
+        const host = url.hostname.replace(/^www\./, "").toLowerCase();
+
+        if (host === "youtu.be") {
+          const id = url.pathname.split("/").filter(Boolean)[0];
+          return id || null;
+        }
+
+        if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+          if (url.pathname === "/watch") return url.searchParams.get("v");
+          const parts = url.pathname.split("/").filter(Boolean);
+          const shortsIndex = parts.indexOf("shorts");
+          if (shortsIndex !== -1 && parts[shortsIndex + 1]) return parts[shortsIndex + 1];
+          const embedIndex = parts.indexOf("embed");
+          if (embedIndex !== -1 && parts[embedIndex + 1]) return parts[embedIndex + 1];
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    function updateYouTubeVideo(forceAutoplay) {
+      const ytInput = document.getElementById("ytInput").value.trim();
+      const ytId = extractYouTubeId(ytInput);
+      const container = document.getElementById("ytVideoContainer");
+      const embed = document.getElementById("ytEmbed");
+      const ytError = document.getElementById("ytError");
+      const isWebContext = window.location.protocol === "http:" || window.location.protocol === "https:";
+
+      if (ytId) {
+        const ytBase = isWebContext ? "https://www.youtube.com/embed/" : "https://www.youtube-nocookie.com/embed/";
+        const embedUrl = new URL(ytBase + encodeURIComponent(ytId));
+        embedUrl.searchParams.set("autoplay", forceAutoplay ? "1" : "0");
+        embedUrl.searchParams.set("playsinline", "1");
+        embedUrl.searchParams.set("rel", "0");
+        if (isWebContext) {
+          embedUrl.searchParams.set("origin", window.location.origin);
+          embedUrl.searchParams.set("widget_referrer", window.location.href);
+        }
+        embed.src = embedUrl.toString();
+        container.style.display = "block";
+        ytError.style.display = "none";
+        return;
+      }
+
+      embed.src = "";
+      container.style.display = "none";
+      ytError.style.display = ytInput ? "block" : "none";
+    }
+
+    function autoEmbedYouTube(forceAutoplay) {
+      updateYouTubeVideo(!!forceAutoplay);
+    }
+
+    async function pasteFromClipboard() {
+      try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById("newVideoUrl").value = text;
+        updateVideo();
+      } catch (error) {
+        alert("Clipboard access failed: " + error);
+      }
+    }
+
+    async function pasteFromClipboardYouTube() {
+      try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById("ytInput").value = text;
+        updateYouTubeVideo(true);
+      } catch (error) {
+        alert("Clipboard access failed: " + error);
+      }
+    }
+
+    document.getElementById("ytInput").addEventListener("input", function () {
+      autoEmbedYouTube(false);
+    });
+    document.getElementById("ytInput").addEventListener("paste", function () {
+      setTimeout(function () {
+        autoEmbedYouTube(true);
+      }, 0);
+    });
+  </script>
+  </div>
+</body>
+</html>
