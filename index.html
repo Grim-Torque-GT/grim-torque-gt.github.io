@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DM + YT Advanced Player</title>
+<title>Auto Video Player</title>
 
 <style>
 :root{
@@ -52,24 +52,22 @@ body{
   border-color:var(--accent);
 }
 
-/* Panels */
 .panel{ display:none; }
 .panel.active{ display:block; }
 
-/* Inputs */
+/* Input */
 .input-row{
   display:flex;
-  gap:10px;
   justify-content:center;
 }
 
 input{
+  width:70%;
   padding:12px;
   border-radius:999px;
   border:1px solid var(--border);
   background:var(--panel2);
   color:#fff;
-  width:60%;
   outline:none;
 }
 
@@ -78,56 +76,21 @@ input:focus{
   box-shadow:var(--glow);
 }
 
-button{
-  padding:10px 14px;
-  border-radius:999px;
-  border:1px solid var(--border);
-  background:var(--panel2);
-  color:#fff;
-  cursor:pointer;
-}
-
-button:hover{
-  background:var(--accent);
-  box-shadow:var(--glow);
-}
-
-/* Video container */
+/* Video */
 .video-wrap{
-  position:relative;
   margin-top:14px;
   height:65vh;
   min-height:320px;
   border-radius:16px;
   overflow:hidden;
-  background:black;
+  background:#000;
   border:1px solid var(--border);
 }
 
-/* iframe */
 iframe{
   width:100%;
   height:100%;
   border:none;
-}
-
-/* YouTube controls overlay */
-.controls{
-  position:absolute;
-  bottom:10px;
-  left:10px;
-  right:10px;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:10px;
-  background:rgba(0,0,0,0.65);
-  border-radius:12px;
-  backdrop-filter:blur(6px);
-}
-
-.slider{
-  flex:1;
 }
 
 /* error */
@@ -149,41 +112,31 @@ iframe{
   <button id="tabYT" class="tab-btn" onclick="switchTab('yt')">YouTube</button>
 </div>
 
-<!-- DAILYMOTION -->
+<!-- Dailymotion -->
 <div id="dmPanel" class="panel active">
 
   <div class="input-row">
-    <input id="dmInput" placeholder="Paste Dailymotion URL">
-    <button onclick="loadDM()">Load</button>
+    <input id="dmInput" placeholder="Paste Dailymotion URL (auto play)">
   </div>
 
-  <div class="error" id="dmError" style="display:none;">Invalid Dailymotion URL</div>
+  <div id="dmError" class="error" style="display:none;">Invalid Dailymotion URL</div>
 
-  <div class="video-wrap" id="dmBox" style="display:none;">
+  <div id="dmBox" class="video-wrap" style="display:none;">
     <iframe id="dmFrame"></iframe>
   </div>
 </div>
 
-<!-- YOUTUBE -->
+<!-- YouTube -->
 <div id="ytPanel" class="panel">
 
   <div class="input-row">
-    <input id="ytInput" placeholder="Paste YouTube URL">
-    <button onclick="loadYT()">Load</button>
+    <input id="ytInput" placeholder="Paste YouTube URL (auto play)">
   </div>
 
-  <div class="error" id="ytError" style="display:none;">Invalid YouTube URL</div>
+  <div id="ytError" class="error" style="display:none;">Invalid YouTube URL</div>
 
-  <div class="video-wrap" id="ytBox" style="display:none;">
+  <div id="ytBox" class="video-wrap" style="display:none;">
     <div id="ytPlayer"></div>
-
-    <!-- Overlay Controls -->
-    <div class="controls">
-      <button onclick="togglePlay()">▶ / ⏸</button>
-      <button onclick="toggleMute()">🔇</button>
-      <input class="slider" type="range" min="0" max="100" value="50" oninput="setVolume(this.value)">
-      <button onclick="fullscreen()">⛶</button>
-    </div>
   </div>
 
 </div>
@@ -205,24 +158,30 @@ function switchTab(t){
   document.getElementById("ytPanel").classList.toggle("active",t==="yt");
 }
 
-/* Dailymotion */
-function loadDM(){
-  const url = document.getElementById("dmInput").value.trim();
-  const match = url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
+/* -------- DAILYMOTION AUTO -------- */
+function parseDM(url){
+  const m = url.match(/(?:video\/|dai\.ly\/)([a-zA-Z0-9]+)/);
+  return m ? m[1] : null;
+}
 
-  if(!match){
-    document.getElementById("dmError").style.display="block";
-    document.getElementById("dmBox").style.display="none";
+function updateDM(){
+  const url = document.getElementById("dmInput").value.trim();
+  const id = parseDM(url);
+
+  if(!id){
+    document.getElementById("dmBox").style.display = url ? "none":"none";
+    document.getElementById("dmError").style.display = url ? "block":"none";
     return;
   }
 
   document.getElementById("dmError").style.display="none";
   document.getElementById("dmBox").style.display="block";
+
   document.getElementById("dmFrame").src =
-    "https://geo.dailymotion.com/player.html?video=" + match[1];
+    "https://geo.dailymotion.com/player.html?video=" + id;
 }
 
-/* YouTube ID */
+/* -------- YOUTUBE AUTO -------- */
 function getYT(url){
   try{
     const u = new URL(url);
@@ -232,11 +191,13 @@ function getYT(url){
   return null;
 }
 
-/* YouTube load */
-function loadYT(){
-  const id = getYT(document.getElementById("ytInput").value);
+function updateYT(){
+  const url = document.getElementById("ytInput").value.trim();
+  const id = getYT(url);
+
   if(!id){
-    document.getElementById("ytError").style.display="block";
+    document.getElementById("ytError").style.display = url ? "block":"none";
+    document.getElementById("ytBox").style.display="none";
     return;
   }
 
@@ -250,29 +211,22 @@ function loadYT(){
 
   player = new YT.Player('ytPlayer',{
     videoId:id,
-    playerVars:{rel:0, modestbranding:1}
+    playerVars:{
+      rel:0,
+      autoplay:1,
+      modestbranding:1
+    }
   });
 }
 
-/* Controls */
-function togglePlay(){
-  const state = player.getPlayerState();
-  state===1 ? player.pauseVideo() : player.playVideo();
-}
+/* -------- AUTO DETECT EVENTS -------- */
+document.getElementById("dmInput").addEventListener("input", updateDM);
+document.getElementById("dmInput").addEventListener("paste", ()=>setTimeout(updateDM,0));
 
-function toggleMute(){
-  player.isMuted() ? player.unMute() : player.mute();
-}
+document.getElementById("ytInput").addEventListener("input", updateYT);
+document.getElementById("ytInput").addEventListener("paste", ()=>setTimeout(updateYT,0));
 
-function setVolume(v){
-  player.setVolume(v);
-}
-
-function fullscreen(){
-  document.getElementById("ytBox").requestFullscreen();
-}
-
-/* API ready */
+/* YouTube API */
 function onYouTubeIframeAPIReady(){}
 </script>
 
